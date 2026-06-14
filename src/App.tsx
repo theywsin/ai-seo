@@ -510,7 +510,7 @@ export default function App() {
 
           {/* WP System Information Badge in Sidebar Footer */}
           <div className="mt-auto pt-6 text-[11px] text-slate-500 font-mono space-y-1">
-            <div>PHP Engine: <span className="text-slate-400">{status?.phpVersion || "8.2.10"}</span></div>
+            <div>PHP Engine: <span className="text-slate-400">{status?.phpVersion || "7.3.33"}</span></div>
             <div>Yoast API Meta: <span className="text-slate-400">سازگار (سبز)</span></div>
             <div>Database Engine: <span className="text-slate-400">MySql-InnoDB</span></div>
           </div>
@@ -1417,7 +1417,7 @@ export default function App() {
                       کدهای شیءگرا و کلاس‌های PHP افزونه وردپرس
                     </h2>
                     <p className="text-xs text-slate-400 mt-1">
-                      تمامی کدهای منبع این افزونه حرفه‌ای با رعایت دقیق‌ترین چارچوب‌های PHP 8.2 و شیءگرایی PSR-4 در پوشه نصب در دسترس شماست.
+                      تمامی کدهای منبع این افزونه حرفه‌ای با رعایت دقیق‌ترین چارچوب‌های PHP 7.3 و شیءگرایی PSR-4 در پوشه نصب در دسترس شماست.
                     </p>
                   </div>
                   

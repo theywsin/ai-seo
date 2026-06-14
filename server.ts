@@ -11,9 +11,20 @@ const PORT = 3000;
 
 app.use(express.json());
 
+// Global settings storage
+const settingsStore = {
+  api_provider: "gemini",
+  api_key: process.env.GEMINI_API_KEY || "",
+  model_name: "gemini-3.5-flash",
+  content_tone: "آموزشی و متقاعدکننده",
+  target_words: 1800,
+  default_post_status: "draft",
+  publish_interval: "daily"
+};
+
 // Initialize Gemini API Client
 let ai: GoogleGenAI | null = null;
-const API_KEY = process.env.GEMINI_API_KEY;
+const API_KEY = settingsStore.api_key;
 
 if (API_KEY) {
   ai = new GoogleGenAI({
@@ -58,14 +69,49 @@ const sitePages = [
 
 // Endpoint: Check API Status
 app.get("/api/status", (req, res) => {
+  const hasKey = !!(settingsStore.api_key || process.env.GEMINI_API_KEY);
   res.json({
-    hasApiKey: !!process.env.GEMINI_API_KEY,
-    status: process.env.GEMINI_API_KEY ? "متصل" : "کلید API یافت نشد (لطفاً در بخش تنظیمات وارد کنید)",
-    model: "gemini-3.5-flash",
-    phpVersion: "8.2.10",
+    hasApiKey: hasKey,
+    status: hasKey ? "متصل" : "کلید API یافت نشد (لطفاً در بخش تنظیمات وارد کنید)",
+    model: settingsStore.model_name || "gemini-3.5-flash",
+    phpVersion: "7.3.33",
     wordPressVersion: "6.4.3",
     yoastVersion: "22.5"
   });
+});
+
+// Endpoint: Get Settings
+app.get("/api/settings", (req, res) => {
+  res.json(settingsStore);
+});
+
+// Endpoint: Update Settings
+app.post("/api/settings", (req, res) => {
+  const { api_provider, api_key, model_name, content_tone, target_words, default_post_status, publish_interval } = req.body;
+  if (api_provider) settingsStore.api_provider = api_provider;
+  if (api_key !== undefined) settingsStore.api_key = api_key;
+  if (model_name) settingsStore.model_name = model_name;
+  if (content_tone) settingsStore.content_tone = content_tone;
+  if (target_words !== undefined) settingsStore.target_words = target_words;
+  if (default_post_status) settingsStore.default_post_status = default_post_status;
+  if (publish_interval) settingsStore.publish_interval = publish_interval;
+
+  // Re-initialize Gemini client
+  const activeKey = settingsStore.api_key;
+  if (activeKey) {
+    ai = new GoogleGenAI({
+      apiKey: activeKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+  } else {
+    ai = null;
+  }
+
+  res.json({ success: true, settings: settingsStore });
 });
 
 // Endpoint: Database Get Keywords

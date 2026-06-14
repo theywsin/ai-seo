@@ -9,7 +9,7 @@
  * License:     GPL2
  * Text Domain: ai-seo-auto-publisher
  * Domain Path: /languages
- * Requires PHP: 8.2
+ * Requires PHP: 7.3
  * Requires at least: 6.0
  */
 
