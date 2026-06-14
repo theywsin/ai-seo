@@ -1,0 +1,6 @@
+{
+  "name": "AI SEO Auto Publisher Pro",
+  "description": "افزونه حرفه‌ای وردپرس برای تولید محتوای سئو شده با سیستم شبیه‌ساز و پنل مدیریت هوشمند ری‌اکت به همراه سئو Yoast و لینک‌سازی داخلی خودکار.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
