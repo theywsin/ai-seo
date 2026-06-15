@@ -3,7 +3,8 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
-createRoot(document.getElementById('root')!).render(
+const container = document.getElementById('ai-seo-app-root') || document.getElementById('root');
+createRoot(container!).render(
   <StrictMode>
     <App />
   </StrictMode>,

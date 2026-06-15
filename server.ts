@@ -3,6 +3,7 @@ import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
+import AdmZip from "adm-zip";
 
 dotenv.config();
 
@@ -402,6 +403,26 @@ app.post("/api/generate", async (req, res) => {
       status: "error"
     });
     res.status(500).json({ error: error.message || "تولید مقاله با شکست مواجه شد." });
+  }
+});
+
+// Endpoint: Download WordPress Plugin as ZIP
+app.get("/api/download-plugin", (req, res) => {
+  try {
+    const zip = new AdmZip();
+    const pluginDir = path.join(process.cwd(), "wordpress-plugin", "ai-seo-auto-publisher-pro");
+    
+    // Add the local folder into the ZIP under 'ai-seo-auto-publisher-pro/'
+    zip.addLocalFolder(pluginDir, "ai-seo-auto-publisher-pro");
+    
+    const zipBuffer = zip.toBuffer();
+    
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", "attachment; filename=ai-seo-auto-publisher-pro.zip");
+    res.send(zipBuffer);
+  } catch (error: any) {
+    console.error("ZIP Generation Error:", error);
+    res.status(500).json({ error: "خطا در تولید فایل فشرده افزونه." });
   }
 });
 

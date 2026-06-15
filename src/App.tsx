@@ -88,6 +88,37 @@ interface ArticleGenerationResult {
   offlineSimulator?: boolean;
 }
 
+// Unified fetch wrapper to handle both the mock Express API and the live WordPress REST API environment
+async function apiRequest(path: string, options: RequestInit = {}): Promise<Response> {
+  const wpSettings = (window as any).aiSeoSettings;
+  let url = path;
+  const headers = new Headers(options.headers || {});
+
+  if (wpSettings && wpSettings.root) {
+    let subpath = path.replace(/^\/api/, '');
+    
+    // Map fake endpoints to authentic WordPress REST API endpoints
+    if (subpath === '/status' || subpath === '/queue' || subpath === '/logs') {
+      subpath = '/stats'; 
+    }
+    
+    url = wpSettings.root.replace(/\/$/, '') + subpath;
+    
+    if (wpSettings.nonce) {
+      headers.set('X-WP-Nonce', wpSettings.nonce);
+    }
+  }
+
+  if (options.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  return fetch(url, {
+    ...options,
+    headers,
+  });
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [status, setStatus] = useState<APIStatus | null>(null);
@@ -141,17 +172,67 @@ export default function App() {
     try {
       setIsLoadingStatus(true);
       const [resStatus, resKeywords, resQueue, resLogs, resSettings] = await Promise.all([
-        fetch("/api/status").then(r => r.json()),
-        fetch("/api/keywords").then(r => r.json()),
-        fetch("/api/queue").then(r => r.json()),
-        fetch("/api/logs").then(r => r.json()),
-        fetch("/api/settings").then(r => r.json())
+        apiRequest("/api/status").then(r => r.json()),
+        apiRequest("/api/keywords").then(r => r.json()),
+        apiRequest("/api/queue").then(r => r.json().catch(() => [])),
+        apiRequest("/api/logs").then(r => r.json().catch(() => [])),
+        apiRequest("/api/settings").then(r => r.json())
       ]);
 
-      setStatus(resStatus);
-      setKeywords(resKeywords);
-      setQueue(resQueue);
-      setLogs(resLogs);
+      const wpSettings = (window as any).aiSeoSettings;
+
+      let finalStatus = resStatus;
+      let finalKeywords = resKeywords;
+      let finalQueue = resQueue;
+      let finalLogs = resLogs;
+
+      if (wpSettings) {
+        // Real WordPress Site Data Mapping
+        finalStatus = {
+          hasApiKey: !!(resSettings && resSettings.api_key),
+          status: (resSettings && resSettings.api_key) ? "متصل" : "کلید API یافت نشده (لطفاً در بخش تنظیمات وارد کنید)",
+          model: resSettings?.model_name || "gemini-3.5-flash",
+          phpVersion: "7.3.33",
+          wordPressVersion: "6.4.3",
+          yoastVersion: "22.5"
+        };
+        
+        finalLogs = (resStatus?.logs || []).map((l: any) => ({
+          id: parseInt(l.id || "0"),
+          timestamp: l.created_at || new Date().toISOString(),
+          action: l.action,
+          message: l.message,
+          status: l.status
+        }));
+        
+        finalQueue = (resKeywords || [])
+          .filter((k: any) => k.status === 'queued')
+          .map((k: any) => ({
+            id: k.id,
+            keyword: k.keyword || k.text,
+            category: k.category,
+            scheduled: "زمان‌بندی کرون خودکار",
+            retryCount: 0,
+            priority: k.priority
+          }));
+      }
+
+      // Consistent keyword structural mapping
+      const normalizedKeywords = (finalKeywords || []).map((k: any) => ({
+        id: k.id,
+        text: k.text || k.keyword || "",
+        category: k.category || "عمومی",
+        priority: k.priority || "medium",
+        cluster: k.cluster || "خوشه متفرقه",
+        status: k.status || "queued",
+        usedIn: k.usedIn || (k.used_in_post_id ? `نوشته شماره #${k.used_in_post_id}` : null)
+      }));
+
+      setStatus(finalStatus);
+      setKeywords(normalizedKeywords);
+      setQueue(finalQueue);
+      setLogs(finalLogs);
+
       if (resSettings && !resSettings.error) {
         setSettings({
           ...settings,
@@ -180,11 +261,11 @@ export default function App() {
     }
 
     try {
-      const response = await fetch("/api/keywords", {
+      const response = await apiRequest("/api/keywords", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: newKeywordText,
+          keyword: newKeywordText, // For real WordPress Rest API
           category: newKeywordCategory,
           priority: newKeywordPriority,
           cluster: newKeywordCluster
@@ -207,7 +288,7 @@ export default function App() {
   // Trigger keyword deletion
   const handleDeleteKeyword = async (id: number) => {
     try {
-      await fetch(`/api/keywords/${id}`, { method: "DELETE" });
+      await apiRequest(`/api/keywords/${id}`, { method: "DELETE" });
       fetchAllData();
     } catch (err) {
       console.error(err);
@@ -219,9 +300,8 @@ export default function App() {
     e.preventDefault();
     setSettingsSuccessMsg(false);
     try {
-      const response = await fetch("/api/settings", {
+      const response = await apiRequest("/api/settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings)
       });
       if (response.ok) {
@@ -252,9 +332,8 @@ export default function App() {
     }
 
     try {
-      const response = await fetch("/api/generate", {
+      const response = await apiRequest("/api/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           keyword: nextItem.text,
           category: nextItem.category,
@@ -312,9 +391,8 @@ export default function App() {
     }, 1800);
 
     try {
-      const response = await fetch("/api/generate", {
+      const response = await apiRequest("/api/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           keyword: selectedGeneratorKeyword,
           category: selectedGeneratorCategory,
@@ -373,11 +451,11 @@ export default function App() {
 
     // Post to server endpoints dynamically or simulate locally
     loadedCsvKeywords.forEach(async (kw) => {
-      await fetch("/api/keywords", {
+      await apiRequest("/api/keywords", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: kw.text,
+          keyword: kw.text, // For real WordPress Rest API
           category: kw.category,
           priority: kw.priority,
           cluster: kw.cluster
@@ -1422,7 +1500,15 @@ export default function App() {
                   </div>
                   
                   {/* Download Documentation and Plugin details */}
-                  <div className="flex shrink-0">
+                  <div className="flex shrink-0 gap-3 flex-wrap">
+                    <a
+                      href="/api/download-plugin"
+                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-slate-100 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-500/10"
+                    >
+                      <Download className="w-4 h-4 text-white" />
+                      <span>دانلود کامل افزونه (فایل ZIP افزونه PHP 7.3)</span>
+                    </a>
+
                     <a
                       href="/wordpress-plugin/ai-seo-auto-publisher-pro/install-documentation.md"
                       download="install-documentation.md"
